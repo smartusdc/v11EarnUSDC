@@ -1,326 +1,627 @@
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-
-const AdminDashboard = () => {
-  // States for form inputs
-  const [newAPR, setNewAPR] = useState('');
-  const [referrerRate, setReferrerRate] = useState('');
-  const [referredRate, setReferredRate] = useState('');
-  const [accountToFreeze, setAccountToFreeze] = useState('');
-  const [emergencyWithdrawAmount, setEmergencyWithdrawAmount] = useState('');
-  const [balanceSummary, setBalanceSummary] = useState(null);
-  const [notification, setNotification] = useState({ type: '', message: '' });
-  const [isConnected, setIsConnected] = useState(false);
-  const [userAddress, setUserAddress] = useState('');
-  const [contract, setContract] = useState(null);
-  const [web3, setWeb3] = useState(null);
-
-  useEffect(() => {
-    initWeb3();
-  }, []);
-
-  const initWeb3 = async () => {
-    if (window.ethereum) {
-      const Web3 = window.Web3;
-      const web3Instance = new Web3(window.ethereum);
-      setWeb3(web3Instance);
-
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const userAddr = accounts[0];
-        setUserAddress(userAddr);
-        setIsConnected(true);
-
-        const contractInstance = new web3Instance.eth.Contract(
-          CONTRACT_ABI,
-          CONTRACT_ADDRESS
-        );
-        setContract(contractInstance);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USDC Staking Platform - Admin Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.10.0/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1a56db;
+            --danger-color: #dc2626;
+            --warning-color: #d97706;
+            --success-color: #059669;
+        }
         
-        // Load initial balance summary
-        await updateBalanceSummary(contractInstance);
-      } catch (error) {
-        showNotification('error', 'Failed to connect wallet: ' + error.message);
-      }
-    } else {
-      showNotification('error', 'Please install MetaMask!');
-    }
-  };
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f3f4f6;
+        }
 
-  const updateBalanceSummary = async (contractInstance) => {
-    try {
-      const summary = await contractInstance.methods.getBalanceSummary().call();
-      setBalanceSummary({
-        contractBalance: web3.utils.fromWei(summary.contractBalance, 'mwei'),
-        totalDeposits: web3.utils.fromWei(summary.totalDepositAmount, 'mwei'),
-        totalRewards: web3.utils.fromWei(summary.totalRewardAmount, 'mwei'),
-        totalReferralRewards: web3.utils.fromWei(summary.totalReferralAmount, 'mwei')
-      });
-    } catch (error) {
-      showNotification('error', 'Failed to fetch balance summary');
-    }
-  };
+        .container {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
 
-  const showNotification = (type, message) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification({ type: '', message: '' }), 5000);
-  };
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e5e7eb;
+        }
 
-  const handleSetAPR = async () => {
-    try {
-      await contract.methods.setAPR(Math.floor(parseFloat(newAPR) * 100))
-        .send({ from: userAddress });
-      showNotification('success', 'APR updated successfully');
-      setNewAPR('');
-    } catch (error) {
-      showNotification('error', 'Failed to update APR: ' + error.message);
-    }
-  };
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
 
-  const handleSetReferralRates = async () => {
-    try {
-      await contract.methods.setReferralRewardRates(
-        Math.floor(parseFloat(referrerRate) * 100),
-        Math.floor(parseFloat(referredRate) * 100)
-      ).send({ from: userAddress });
-      showNotification('success', 'Referral rates updated successfully');
-      setReferrerRate('');
-      setReferredRate('');
-    } catch (error) {
-      showNotification('error', 'Failed to update referral rates: ' + error.message);
-    }
-  };
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
 
-  const handleTogglePause = async (type) => {
-    try {
-      const method = `toggle${type}Pause`;
-      await contract.methods[method]().send({ from: userAddress });
-      showNotification('success', `${type} toggle successful`);
-    } catch (error) {
-      showNotification('error', `Failed to toggle ${type}: ` + error.message);
-    }
-  };
+        .card-header {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 16px;
+        }
 
-  const handleFreezeAccount = async () => {
-    if (!web3.utils.isAddress(accountToFreeze)) {
-      showNotification('error', 'Invalid address format');
-      return;
-    }
+        .input-group {
+            margin-bottom: 16px;
+        }
 
-    try {
-      await contract.methods.setAccountFrozen(accountToFreeze, true)
-        .send({ from: userAddress });
-      showNotification('success', 'Account frozen successfully');
-      setAccountToFreeze('');
-    } catch (error) {
-      showNotification('error', 'Failed to freeze account: ' + error.message);
-    }
-  };
+        input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+        }
 
-  const handleEmergencyWithdraw = async () => {
-    try {
-      const amountWei = web3.utils.toWei(emergencyWithdrawAmount, 'mwei');
-      await contract.methods.emergencyWithdraw(amountWei)
-        .send({ from: userAddress });
-      showNotification('success', 'Emergency withdrawal successful');
-      setEmergencyWithdrawAmount('');
-      await updateBalanceSummary(contract);
-    } catch (error) {
-      showNotification('error', 'Failed to perform emergency withdrawal: ' + error.message);
-    }
-  };
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.1);
+        }
 
-  if (!isConnected) {
-    return (
-      <div className="p-4">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>
-            Please connect your wallet to access the admin dashboard.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+        button {
+            width: 100%;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
 
-  return (
-    <div className="max-w-4xl mx-auto p-4 space-y-6">
-      <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
-      {notification.message && (
-        <Alert variant={notification.type === 'error' ? 'destructive' : 'default'}>
-          {notification.type === 'error' ? (
-            <AlertTriangle className="h-4 w-4" />
-          ) : (
-            <CheckCircle className="h-4 w-4" />
-          )}
-          <AlertTitle>{notification.type === 'error' ? 'Error' : 'Success'}</AlertTitle>
-          <AlertDescription>{notification.message}</AlertDescription>
-        </Alert>
-      )}
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Contract Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {balanceSummary && (
-              <div className="space-y-2">
-                <p>Contract Balance: {balanceSummary.contractBalance} USDC</p>
-                <p>Total Deposits: {balanceSummary.totalDeposits} USDC</p>
-                <p>Total Rewards: {balanceSummary.totalRewards} USDC</p>
-                <p>Total Referral Rewards: {balanceSummary.totalReferralRewards} USDC</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        .btn-primary:hover {
+            background: #1e40af;
+        }
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Update APR</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <input
-                type="number"
-                value={newAPR}
-                onChange={(e) => setNewAPR(e.target.value)}
-                placeholder="New APR (%)"
-                className="w-full p-2 border rounded"
-              />
-              <button
-                onClick={handleSetAPR}
-                className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-              >
-                Set APR
-              </button>
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #b45309;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #ecfdf5;
+            color: var(--success-color);
+            border: 1px solid #a7f3d0;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            color: var(--danger-color);
+            border: 1px solid #fecaca;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 12px;
+            color: #6b7280;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-item {
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        #debugInfo {
+            margin-top: 24px;
+            padding: 12px;
+            background: #1f2937;
+            color: #e5e7eb;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.875rem;
+            display: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Admin Dashboard</h1>
+            <button id="connectWallet" class="btn-primary">Connect Wallet</button>
+        </div>
+
+        <div id="alert" class="alert"></div>
+        <div id="loading" class="loading">Processing...</div>
+
+        <div id="mainContent" style="display: none;">
+            <div class="card">
+                <div class="card-header">Contract Summary</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="contractBalance">0</div>
+                        <div class="stat-label">Contract Balance (USDC)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalDeposits">0</div>
+                        <div class="stat-label">Total Deposits (USDC)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalRewards">0</div>
+                        <div class="stat-label">Total Rewards (USDC)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalReferralRewards">0</div>
+                        <div class="stat-label">Total Referral Rewards (USDC)</div>
+                    </div>
+                </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Referral Rates</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <input
-                type="number"
-                value={referrerRate}
-                onChange={(e) => setReferrerRate(e.target.value)}
-                placeholder="Referrer Rate (%)"
-                className="w-full p-2 border rounded"
-              />
-              <input
-                type="number"
-                value={referredRate}
-                onChange={(e) => setReferredRate(e.target.value)}
-                placeholder="Referred Rate (%)"
-                className="w-full p-2 border rounded"
-              />
-              <button
-                onClick={handleSetReferralRates}
-                className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-              >
-                Update Rates
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">Update APR</div>
+                    <div class="input-group">
+                        <input type="number" id="newAPR" placeholder="New APR (%)">
+                        <button id="setAPR" class="btn-primary">Set APR</button>
+                    </div>
+                </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Contract Controls</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <button
-                onClick={() => handleTogglePause('Deposit')}
-                className="w-full bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600"
-              >
-                Toggle Deposit Pause
-              </button>
-              <button
-                onClick={() => handleTogglePause('Withdrawal')}
-                className="w-full bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600"
-              >
-                Toggle Withdrawal Pause
-              </button>
-              <button
-                onClick={() => handleTogglePause('RewardClaim')}
-                className="w-full bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600"
-              >
-                Toggle Reward Claim Pause
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+                <div class="card">
+                    <div class="card-header">Referral Rates</div>
+                    <div class="input-group">
+                        <input type="number" id="referrerRate" placeholder="Referrer Rate (%)">
+                        <input type="number" id="referredRate" placeholder="Referred Rate (%)">
+                        <button id="setReferralRates" class="btn-primary">Update Rates</button>
+                    </div>
+                </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Management</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <input
-                type="text"
-                value={accountToFreeze}
-                onChange={(e) => setAccountToFreeze(e.target.value)}
-                placeholder="Account Address"
-                className="w-full p-2 border rounded"
-              />
-              <button
-                onClick={handleFreezeAccount}
-                className="w-full bg-red-500 text-white p-2 rounded hover:bg-red-600"
-              >
-                Freeze Account
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+                <div class="card">
+                    <div class="card-header">Contract Controls</div>
+                    <div class="input-group">
+                        <button id="toggleDeposit" class="btn-warning">Toggle Deposit Pause</button>
+                        <button id="toggleWithdrawal" class="btn-warning">Toggle Withdrawal Pause</button>
+                        <button id="toggleRewardClaim" class="btn-warning">Toggle Reward Claim Pause</button>
+                    </div>
+                </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Emergency Withdraw</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <input
-                type="number"
-                value={emergencyWithdrawAmount}
-                onChange={(e) => setEmergencyWithdrawAmount(e.target.value)}
-                placeholder="Amount (USDC)"
-                className="w-full p-2 border rounded"
-              />
-              <button
-                onClick={handleEmergencyWithdraw}
-                className="w-full bg-red-500 text-white p-2 rounded hover:bg-red-600"
-              >
-                Emergency Withdraw
-              </button>
+                <div class="card">
+                    <div class="card-header">Account Management</div>
+                    <div class="input-group">
+                        <input type="text" id="accountToFreeze" placeholder="Account Address">
+                        <button id="freezeAccount" class="btn-danger">Freeze Account</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Emergency Withdraw</div>
+                    <div class="input-group">
+                        <input type="number" id="emergencyWithdrawAmount" placeholder="Amount (USDC)">
+                        <button id="emergencyWithdraw" class="btn-danger">Emergency Withdraw</button>
+                    </div>
+                </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+        </div>
+
+        <div id="debugInfo"></div>
     </div>
-  );
-};
 
-const CONTRACT_ADDRESS = '0x708A8Fc8ccaDaB721388a4ABc99581AE3fd19e6F';
-const CONTRACT_ABI = [
-  // Contract ABI from your smart contract
-  {"inputs":[{"name":"_newAPR","type":"uint256"}],"name":"setAPR","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"name":"_referrerRate","type":"uint256"},{"name":"_referredRate","type":"uint256"}],"name":"setReferralRewardRates","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"toggleDepositPause","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"toggleWithdrawalPause","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"toggleRewardClaimPause","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"name":"account","type":"address"},{"name":"frozen","type":"bool"}],"name":"setAccountFrozen","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"name":"amount","type":"uint256"}],"name":"emergencyWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"getBalanceSummary","outputs":[{"name":"contractBalance","type":"uint256"},{"name":"totalDepositAmount","type":"uint256"},{"name":"totalRewardAmount","type":"uint256"},{"name":"totalReferralAmount","type":"uint256"}],"stateMutability":"view","type":"function"}
-];
+    <script>
+        // Contract Configuration
+        const CONTRACT_ADDRESS = '0x708A8Fc8ccaDaB721388a4ABc99581AE3fd19e6F';
+        const BASE_CHAIN_ID = '0x2105';
+        const DEBUG_MODE = true;
 
-export default AdminDashboard;
+        // Contract ABI
+        const CONTRACT_ABI = [
+            {"inputs":[{"name":"_newAPR","type":"uint256"}],"name":"setAPR","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"name":"_referrerRate","type":"uint256"},{"name":"_referredRate","type":"uint256"}],"name":"setReferralRewardRates","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"toggleDepositPause","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"toggleWithdrawalPause","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"toggleRewardClaimPause","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"name":"account","type":"address"},{"name":"frozen","type":"bool"}],"name":"setAccountFrozen","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"name":"amount","type":"uint256"}],"name":"emergencyWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"getBalanceSummary","outputs":[{"name":"contractBalance","type":"uint256"},{"name":"totalDepositAmount","type":"uint256"},{"name":"totalRewardAmount","type":"uint256"},{"name":"totalReferralAmount","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"stateMutability":"view","type":"function"}
+        ];
+
+        // Global Variables
+        let web3;
+        let contract;
+        let userAddress;
+
+        // Utility Functions
+        function showDebugInfo(info) {
+            if (!DEBUG_MODE) return;
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.style.display = 'block';
+            debugDiv.innerHTML += `<div>[${new Date().toISOString()}] ${info}</div>`;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+        }
+
+        function showAlert(message, type) {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.className = `alert alert-${type}`;
+            alert.style.display = 'block';
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function formatNumber(number, decimals = 6) {
+            return Number(parseFloat(number)).toLocaleString('en-US', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
+        // Initialize Web3
+        async function initWeb3() {
+            if (window.ethereum) {
+                try {
+                    web3 = new Web3(window.ethereum);
+                    contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+                    
+                    // Set up event listeners
+                    document.getElementById('connectWallet').addEventListener('click', connectWallet);
+                    document.getElementById('setAPR').addEventListener('click', handleSetAPR);
+                    document.getElementById('setReferralRates').addEventListener('click', handleSetReferralRates);
+                    document.getElementById('toggleDeposit').addEventListener('click', () => handleTogglePause('Deposit'));
+                    document.getElementById('toggleWithdrawal').addEventListener('click', () => handleTogglePause('Withdrawal'));
+                    document.getElementById('toggleRewardClaim').addEventListener('click', () => handleTogglePause('RewardClaim'));
+                    document.getElementById('freezeAccount').addEventListener('click', handleFreezeAccount);
+                    document.getElementById('emergencyWithdraw').addEventListener('click', handleEmergencyWithdraw);
+
+                    // Check if already connected
+                    const accounts = await web3.eth.getAccounts();
+                    if (accounts.length > 0) {
+                        userAddress = accounts[0];
+                        await checkOwnerAndConnect();
+                    }
+
+                    // Setup MetaMask events
+                    window.ethereum.on('accountsChanged', handleAccountsChanged);
+                    window.ethereum.on('chainChanged', handleChainChanged);
+
+                    showDebugInfo('Web3 initialized successfully');
+                } catch (error) {
+                    console.error("Error initializing Web3:", error);
+                    showAlert('Failed to initialize Web3: ' + error.message, 'error');
+                    showDebugInfo('Web3 initialization error: ' + error.message);
+                }
+            } else {
+                showAlert('Please install MetaMask!', 'error');
+                showDebugInfo('MetaMask not found');
+            }
+        }
+
+        // Connect Wallet
+        async function connectWallet() {
+            if (!window.ethereum) {
+                showAlert('Please install MetaMask!', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                userAddress = accounts[0];
+                showDebugInfo('Wallet connected: ' + userAddress);
+                
+                await checkAndSwitchNetwork();
+                await checkOwnerAndConnect();
+            } catch (error) {
+                console.error("Connection error:", error);
+                showAlert('Failed to connect wallet: ' + error.message, 'error');
+                showDebugInfo('Wallet connection error: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Check Owner and Connect
+        async function checkOwnerAndConnect() {
+            try {
+                const owner = await contract.methods.owner().call();
+                if (owner.toLowerCase() !== userAddress.toLowerCase()) {
+                    showAlert('Only contract owner can access this dashboard', 'error');
+                    return;
+                }
+                
+                document.getElementById('connectWallet').textContent = 
+                    `${userAddress.slice(0,6)}...${userAddress.slice(-4)}`;
+                document.getElementById('mainContent').style.display = 'block';
+                
+                await updateBalanceSummary();
+                showAlert('Connected as admin', 'success');
+            } catch (error) {
+                console.error("Owner check error:", error);
+                showAlert('Failed to verify owner status: ' + error.message, 'error');
+            }
+        }
+
+        // Account Change Handler
+        function handleAccountsChanged(accounts) {
+            if (accounts.length === 0) {
+                userAddress = null;
+                document.getElementById('connectWallet').textContent = 'Connect Wallet';
+                document.getElementById('mainContent').style.display = 'none';
+                showDebugInfo('Wallet disconnected');
+            } else if (accounts[0] !== userAddress) {
+                userAddress = accounts[0];
+                checkOwnerAndConnect();
+                showDebugInfo('Account changed to: ' + userAddress);
+            }
+        }
+
+        // Chain Change Handler
+        function handleChainChanged(chainId) {
+            showDebugInfo('Chain changed to: ' + chainId);
+            if (chainId !== BASE_CHAIN_ID) {
+                showAlert('Please switch to BASE Network', 'error');
+                document.getElementById('mainContent').style.display = 'none';
+            } else {
+                checkOwnerAndConnect();
+            }
+        }
+
+        // Network Switching
+        async function checkAndSwitchNetwork() {
+            if (window.ethereum) {
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                if (chainId !== BASE_CHAIN_ID) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: BASE_CHAIN_ID }],
+                        });
+                    } catch (error) {
+                        if (error.code === 4902) {
+                            try {
+                                await window.ethereum.request({
+                                    method: 'wallet_addEthereumChain',
+                                    params: [{
+                                        chainId: BASE_CHAIN_ID,
+                                        chainName: 'Base',
+                                        nativeCurrency: {
+                                            name: 'ETH',
+                                            symbol: 'ETH',
+                                            decimals: 18
+                                        },
+                                        rpcUrls: ['https://mainnet.base.org'],
+                                        blockExplorerUrls: ['https://basescan.org']
+                                    }]
+                                });
+                            } catch (addError) {
+                                showAlert('Failed to add BASE network', 'error');
+                                throw addError;
+                            }
+                        } else {
+                            showAlert('Failed to switch to BASE network', 'error');
+                            throw error;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update Balance Summary
+        async function updateBalanceSummary() {
+            try {
+                const summary = await contract.methods.getBalanceSummary().call();
+                document.getElementById('contractBalance').textContent = 
+                    formatNumber(web3.utils.fromWei(summary.contractBalance, 'mwei'));
+                document.getElementById('totalDeposits').textContent = 
+                    formatNumber(web3.utils.fromWei(summary.totalDepositAmount, 'mwei'));
+                document.getElementById('totalRewards').textContent = 
+                    formatNumber(web3.utils.fromWei(summary.totalRewardAmount, 'mwei'));
+                document.getElementById('totalReferralRewards').textContent = 
+                    formatNumber(web3.utils.fromWei(summary.totalReferralAmount, 'mwei'));
+                
+                showDebugInfo('Balance summary updated');
+            } catch (error) {
+                console.error("Balance summary error:", error);
+                showAlert('Failed to update balance summary', 'error');
+            }
+        }
+
+        // Set APR
+        async function handleSetAPR() {
+            const newAPR = document.getElementById('newAPR').value;
+            if (!newAPR || isNaN(newAPR) || newAPR <= 0) {
+                showAlert('Please enter a valid APR', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                await contract.methods.setAPR(Math.floor(parseFloat(newAPR) * 100))
+                    .send({ from: userAddress });
+                showAlert('APR updated successfully', 'success');
+                document.getElementById('newAPR').value = '';
+            } catch (error) {
+                console.error("Set APR error:", error);
+                showAlert('Failed to update APR: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Set Referral Rates
+        async function handleSetReferralRates() {
+            const referrerRate = document.getElementById('referrerRate').value;
+            const referredRate = document.getElementById('referredRate').value;
+
+            if (!referrerRate || !referredRate || isNaN(referrerRate) || isNaN(referredRate)) {
+                showAlert('Please enter valid rates', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                await contract.methods.setReferralRewardRates(
+                    Math.floor(parseFloat(referrerRate) * 100),
+                    Math.floor(parseFloat(referredRate) * 100)
+                ).send({ from: userAddress });
+                showAlert('Referral rates updated successfully', 'success');
+                document.getElementById('referrerRate').value = '';
+                document.getElementById('referredRate').value = '';
+            } catch (error) {
+                console.error("Set referral rates error:", error);
+                showAlert('Failed to update referral rates: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Toggle Pause Functions
+        async function handleTogglePause(type) {
+            try {
+                showLoading(true);
+                const method = `toggle${type}Pause`;
+                await contract.methods[method]().send({ from: userAddress });
+                showAlert(`${type} status toggled successfully`, 'success');
+            } catch (error) {
+                console.error(`Toggle ${type} error:`, error);
+                showAlert(`Failed to toggle ${type}: ` + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Freeze Account
+        async function handleFreezeAccount() {
+            const account = document.getElementById('accountToFreeze').value;
+            if (!web3.utils.isAddress(account)) {
+                showAlert('Please enter a valid address', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                await contract.methods.setAccountFrozen(account, true)
+                    .send({ from: userAddress });
+                showAlert('Account frozen successfully', 'success');
+                document.getElementById('accountToFreeze').value = '';
+            } catch (error) {
+                console.error("Freeze account error:", error);
+                showAlert('Failed to freeze account: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Emergency Withdraw
+        async function handleEmergencyWithdraw() {
+            const amount = document.getElementById('emergencyWithdrawAmount').value;
+            if (!amount || isNaN(amount) || amount <= 0) {
+                showAlert('Please enter a valid amount', 'error');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to perform an emergency withdrawal? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                showLoading(true);
+                const amountWei = web3.utils.toWei(amount, 'mwei');
+                await contract.methods.emergencyWithdraw(amountWei)
+                    .send({ from: userAddress });
+                showAlert('Emergency withdrawal successful', 'success');
+                document.getElementById('emergencyWithdrawAmount').value = '';
+                await updateBalanceSummary();
+            } catch (error) {
+                console.error("Emergency withdraw error:", error);
+                showAlert('Failed to perform emergency withdrawal: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Auto-refresh balance summary
+        setInterval(async () => {
+            if (userAddress && document.getElementById('mainContent').style.display !== 'none') {
+                await updateBalanceSummary();
+            }
+        }, 30000); // Update every 30 seconds
+
+        // Initialize application
+        window.addEventListener('load', initWeb3);
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && userAddress) {
+                updateBalanceSummary();
+                showDebugInfo('UI updated due to page visibility change');
+            }
+        });
+    </script>
+</body>
+</html>

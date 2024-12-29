@@ -529,13 +529,9 @@
         document.getElementById('loading').style.display = show ? 'block' : 'none';
     }
 
-    function formatNumber(number, decimals = 6) {
-        return Number(parseFloat(number)).toLocaleString('en-US', {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals
-        });
-    }
-
+   function formatNumber(number, decimals = 6) {
+    return typeof number === 'string' ? number : number.toString();
+}
     async function updatePlatformInfo() {
         try {
             if (!contract) {

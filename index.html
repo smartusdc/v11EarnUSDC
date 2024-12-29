@@ -135,6 +135,60 @@
             max-height: 200px;
             overflow-y: auto;
         }
+        .platform-info-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1rem 2rem;
+            margin: 1rem 0;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 2rem;
+            border: 1px solid #e9ecef;
+        }
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 150px;
+        }
+        .info-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-bottom: 0.3rem;
+        }
+        .info-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2196F3;
+        }
+        .referral-section {
+            position: relative;
+            display: inline-block;
+        }
+        .referral-status {
+            font-size: 0.9em;
+            margin-left: 8px;
+            color: #4CAF50;
+        }
+        .referral-status.active {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            color: #2e7d32;
+        }
+        @media (max-width: 768px) {
+            .platform-info-card {
+                padding: 1rem;
+            }
+            .info-item {
+                min-width: 120px;
+            }
+            .info-value {
+                font-size: 1.2rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -144,6 +198,22 @@
             <div style="display: flex; align-items: center;">
                 <span id="networkStatus" class="network-status"></span>
                 <button id="connectWallet" class="button">Connect Wallet</button>
+            </div>
+        </div>
+
+        <!-- Platform Info Card - 常に表示 -->
+        <div class="platform-info-card">
+            <div class="info-item">
+                <span class="info-label">Current APR</span>
+                <span class="info-value"><span id="currentAPR">0</span>%</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Referrer Reward</span>
+                <span class="info-value"><span id="referrerReward">0</span>%</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Referred Reward</span>
+                <span class="info-value"><span id="referredReward">0</span>%</span>
             </div>
         </div>
 
@@ -170,8 +240,11 @@
                 <h3>Stake USDC</h3>
                 <div class="input-group">
                     <input type="number" id="stakeAmount" placeholder="Amount" step="0.01" min="0.01">
-                    <input type="number" id="referralCode" placeholder="Referral Code (Optional)">
-                    <button id="approveButton" class="button">Approve USDC</button>
+                    <div class="referral-section">
+                        <input type="number" id="referralCode" placeholder="Referral Code (Optional)">
+                        <span id="referralStatus" class="referral-status"></span>
+                    </div>
+                    <button id="approveButton" class="button" style="display: none;">Approve USDC</button>
                     <button id="stakeButton" class="button">Stake</button>
                 </div>
             </div>
@@ -241,7 +314,7 @@
         }
     ];
 
-    // Main Contract ABI Definition
+    // Main Contract ABI Definition - 新しい関数を追加
     const CONTRACT_ABI = [
         {
             "inputs": [{"name": "","type": "address"}],
@@ -323,6 +396,13 @@
             "type": "function"
         },
         {
+            "inputs": [{"name": "","type": "address"}],
+            "name": "userToReferrer",
+            "outputs": [{"name": "","type": "address"}],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
             "anonymous": false,
             "inputs": [
                 {
@@ -338,6 +418,27 @@
             ],
             "name": "ReferralCodeCreated",
             "type": "event"
+        },
+        {
+            "inputs": [],
+            "name": "currentAPR",
+            "outputs": [{"name": "","type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "referrerRewardRate",
+            "outputs": [{"name": "","type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "referredRewardRate",
+            "outputs": [{"name": "","type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
         }
     ];
 
@@ -371,6 +472,29 @@
         });
     }
 
+    // プラットフォーム情報を更新する関数
+    async function updatePlatformInfo() {
+        try {
+            if (!contract) {
+                showDebugInfo('Contract not initialized for platform info update');
+                return;
+            }
+
+            const apr = await contract.methods.currentAPR().call();
+            const referrerRate = await contract.methods.referrerRewardRate().call();
+            const referredRate = await contract.methods.referredRewardRate().call();
+            
+            document.getElementById('currentAPR').textContent = (apr / 100).toFixed(2);
+            document.getElementById('referrerReward').textContent = (referrerRate / 100).toFixed(2);
+            document.getElementById('referredReward').textContent = (referredRate / 100).toFixed(2);
+            
+            showDebugInfo('Platform info updated successfully');
+        } catch (error) {
+            console.error('Error updating platform info:', error);
+            showDebugInfo('Platform info update error: ' + error.message);
+        }
+    }
+
     // Web3 Initialization
     async function initWeb3() {
         if (window.ethereum) {
@@ -378,6 +502,9 @@
                 web3 = new Web3(window.ethereum);
                 contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
                 usdcContract = new web3.eth.Contract(USDC_ABI, USDC_ADDRESS);
+                
+                // 初期プラットフォーム情報の更新
+                await updatePlatformInfo();
                 
                 // Set up event listeners
                 document.getElementById('connectWallet').addEventListener('click', connectWallet);
@@ -387,6 +514,10 @@
                 document.getElementById('claimRewardsButton').addEventListener('click', claimRewards);
                 document.getElementById('generateReferralCode').addEventListener('click', generateReferralCode);
                 document.getElementById('claimReferralRewards').addEventListener('click', claimReferralRewards);
+                document.getElementById('stakeAmount').addEventListener('input', checkAllowance);
+
+                // プラットフォーム情報の定期更新（15分ごと）
+                setInterval(updatePlatformInfo, 15 * 60 * 1000);
 
                 // Check if already connected
                 const accounts = await web3.eth.getAccounts();
@@ -410,6 +541,21 @@
         } else {
             showAlert('Please install MetaMask!', 'error');
             showDebugInfo('MetaMask not found');
+        }
+    }
+
+    // Allowance Check Function
+    async function checkAllowance() {
+        if (!userAddress) return;
+        
+        const amount = document.getElementById('stakeAmount').value;
+        if (amount) {
+            const amountWei = web3.utils.toWei(amount, 'mwei');
+            const allowance = await usdcContract.methods.allowance(userAddress, CONTRACT_ADDRESS).call();
+            document.getElementById('approveButton').style.display = 
+                web3.utils.toBN(allowance).lt(web3.utils.toBN(amountWei)) ? 'inline-block' : 'none';
+        } else {
+            document.getElementById('approveButton').style.display = 'none';
         }
     }
 
@@ -552,10 +698,22 @@
             showDebugInfo('USDC Balance: ' + web3.utils.fromWei(balance, 'mwei'));
 
             // リファラル状態の確認
-            const referralCode = await contract.methods.userToReferralCode(userAddress).call();
+            const [referralCode, referrer] = await Promise.all([
+                contract.methods.userToReferralCode(userAddress).call(),
+                contract.methods.userToReferrer(userAddress).call()
+            ]);
+
             const referralInput = document.getElementById('referralCode');
-            if (referralInput) {
-                referralInput.style.display = referralCode === '0' ? 'block' : 'none';
+            const referralStatus = document.getElementById('referralStatus');
+
+            if (referrer !== '0x0000000000000000000000000000000000000000') {
+                referralInput.style.display = 'none';
+                referralStatus.textContent = '✓ Referral Applied';
+                referralStatus.classList.add('active');
+            } else {
+                referralInput.style.display = 'block';
+                referralStatus.textContent = '';
+                referralStatus.classList.remove('active');
             }
 
             // Get staked amount
@@ -580,8 +738,8 @@
                 formatNumber(web3.utils.fromWei(referralRewards, 'mwei'));
             showDebugInfo('Referral Rewards: ' + web3.utils.fromWei(referralRewards, 'mwei'));
 
-            // Update referral code
-            await updateReferralCode();
+            // Check allowance for current stake amount
+            await checkAllowance();
 
         } catch (error) {
             console.error('Error updating UI:', error);
@@ -607,24 +765,14 @@
             const amountWei = web3.utils.toWei(amount, 'mwei');
             showDebugInfo('Approving amount: ' + amount + ' USDC');
 
-            // Check current allowance
-            const currentAllowance = await usdcContract.methods.allowance(userAddress, CONTRACT_ADDRESS).call();
-            showDebugInfo('Current allowance: ' + web3.utils.fromWei(currentAllowance, 'mwei') + ' USDC');
-
-            if (web3.utils.toBN(currentAllowance).gte(web3.utils.toBN(amountWei))) {
-                showAlert('Approval already sufficient', 'success');
-                showDebugInfo('Existing approval sufficient');
-                return;
-            }
-
             const tx = await usdcContract.methods.approve(CONTRACT_ADDRESS, amountWei)
                 .send({ 
                     from: userAddress,
-                    gasPrice: await web3.eth.getGasPrice(),
-                    gas: 100000
+                    gasPrice: await web3.eth.getGasPrice()
                 });
             showAlert('USDC approved successfully', 'success');
             showDebugInfo('Approval transaction: ' + tx.transactionHash);
+            document.getElementById('approveButton').style.display = 'none';
         } catch (error) {
             console.error('Approval error:', error);
             showAlert('Failed to approve: ' + error.message, 'error');
@@ -650,17 +798,20 @@
             const amountWei = web3.utils.toWei(amount, 'mwei');
             showDebugInfo('Attempting to stake: ' + amount + ' USDC');
 
-            // リファラル状態をチェック
-            const existingReferralCode = await contract.methods.userToReferralCode(userAddress).call();
-            // '0'の場合は初回ユーザーなので、入力値を使用
-            const referralCode = existingReferralCode === '0' ? 
-                (document.getElementById('referralCode').value || '0') : '0';
+            // Check allowance first
+            const allowance = await usdcContract.methods.allowance(userAddress, CONTRACT_ADDRESS).call();
+            if (web3.utils.toBN(allowance).lt(web3.utils.toBN(amountWei))) {
+                showAlert('Please approve USDC first', 'error');
+                document.getElementById('approveButton').style.display = 'inline-block';
+                return;
+            }
+
+            const referralCode = document.getElementById('referralCode').value || '0';
 
             const tx = await contract.methods.depositFunds(amountWei, referralCode)
                 .send({ 
                     from: userAddress,
-                    gasPrice: await web3.eth.getGasPrice(),
-                    gas: 250000
+                    gasPrice: await web3.eth.getGasPrice()
                 });
             showAlert('Staking successful', 'success');
             showDebugInfo('Stake transaction: ' + tx.transactionHash);
@@ -698,8 +849,7 @@
             const tx = await contract.methods.withdraw(amountWei)
                 .send({ 
                     from: userAddress,
-                    gasPrice: await web3.eth.getGasPrice(),
-                    gas: 200000
+                    gasPrice: await web3.eth.getGasPrice()
                 });
             showAlert('Withdrawal successful', 'success');
             showDebugInfo('Withdrawal transaction: ' + tx.transactionHash);
@@ -724,8 +874,7 @@
             const tx = await contract.methods.claimDepositReward()
                 .send({ 
                     from: userAddress,
-                    gasPrice: await web3.eth.getGasPrice(),
-                    gas: 200000
+                    gasPrice: await web3.eth.getGasPrice()
                 });
             showAlert('Rewards claimed successfully', 'success');
             showDebugInfo('Claim rewards transaction: ' + tx.transactionHash);
@@ -740,20 +889,6 @@
     }
 
     // Referral Code Generation
-    async function updateReferralCode() {
-        if (!userAddress) return;
-        
-        try {
-            const code = await contract.methods.userToReferralCode(userAddress).call();
-            if (code !== '0') {
-                document.getElementById('yourReferralCode').textContent = code;
-            }
-        } catch (error) {
-            console.error('Error updating referral code:', error);
-            showDebugInfo('Error updating referral code: ' + error.message);
-        }
-    }
-
     async function generateReferralCode() {
         if (!userAddress) {
             showAlert('Please connect your wallet first', 'error');
@@ -773,23 +908,18 @@
                 return;
             }
 
-            // Generate new referral code
             const tx = await contract.methods.generateReferralCode()
                 .send({ 
                     from: userAddress,
-                    gasPrice: await web3.eth.getGasPrice(),
-                    gas: 200000
+                    gasPrice: await web3.eth.getGasPrice()
                 });
 
-            // Get the generated code from event logs
             const event = tx.events.ReferralCodeCreated;
             if (event) {
                 const generatedCode = event.returnValues.referralCode;
                 document.getElementById('yourReferralCode').textContent = generatedCode;
                 showAlert('Referral code generated successfully', 'success');
                 showDebugInfo('Generated referral code: ' + generatedCode);
-            } else {
-                throw new Error('Failed to get referral code from transaction');
             }
 
             updateUI();
@@ -813,8 +943,7 @@
             const tx = await contract.methods.claimReferralReward()
                 .send({ 
                     from: userAddress,
-                    gasPrice: await web3.eth.getGasPrice(),
-                    gas: 200000
+                    gasPrice: await web3.eth.getGasPrice()
                 });
             showAlert('Referral rewards claimed successfully', 'success');
             showDebugInfo('Claim referral rewards transaction: ' + tx.transactionHash);
@@ -826,45 +955,6 @@
         } finally {
             showLoading(false);
         }
-    }
-
-    // Error Handler Function
-    function handleError(error, context) {
-        console.error(`${context} error:`, error);
-        
-        let errorMessage = error.message;
-        if (error.code === 4001) {
-            errorMessage = 'Transaction rejected by user';
-        } else if (error.code === -32603) {
-            errorMessage = 'Internal JSON-RPC error';
-            showDebugInfo('Possible gas estimation failure or contract revert');
-        }
-        
-        showAlert(`Failed to ${context}: ${errorMessage}`, 'error');
-        showDebugInfo(`${context} error: ${errorMessage}`);
-    }
-
-    // Transaction Parameter Helper
-    async function getTransactionParams() {
-        try {
-            const gasPrice = await web3.eth.getGasPrice();
-            return {
-                from: userAddress,
-                gasPrice: gasPrice,
-            };
-        } catch (error) {
-            showDebugInfo('Error getting gas price: ' + error.message);
-            throw error;
-        }
-    }
-
-    // Amount Validation Helper
-    function validateAmount(amount, context = 'amount') {
-        if (!amount || isNaN(amount) || amount <= 0) {
-            showAlert(`Please enter a valid ${context}`, 'error');
-            return false;
-        }
-        return true;
     }
 
     // Initialize application

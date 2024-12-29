@@ -777,11 +777,17 @@ function formatNumber(number, decimals = 6) {
             const userInfo = await contract.methods.getUserInfo(userAddress).call();
             document.getElementById('totalReferrals').textContent = userInfo.totalReferrals;
 
-          // Get pending rewards
+         // Get pending rewards
             const rewards = await contract.methods.calculateReward(userAddress).call();
-            document.getElementById('pendingRewards').textContent = 
-                formatNumber(web3.utils.fromWei(rewards, 'mwei'), 6);
-            showDebugInfo('Pending Rewards: ' + web3.utils.fromWei(rewards, 'mwei'));
+            const userInfo = await contract.methods.getUserInfo(userAddress).call();
+            
+            showDebugInfo('----------Debug Info----------');
+            showDebugInfo('Raw rewards: ' + rewards);
+            showDebugInfo('Deposit Amount: ' + userInfo.depositAmount);
+            showDebugInfo('Current APR: ' + await contract.methods.currentAPR().call());
+            showDebugInfo('Last Reward Time: ' + userInfo.lastRewardTimestamp);
+            showDebugInfo('Current Time: ' + Math.floor(Date.now() / 1000));
+            showDebugInfo('Time Elapsed: ' + (Math.floor(Date.now() / 1000) - userInfo.lastRewardTimestamp));
 
             const referralRewards = await contract.methods.referralRewards(userAddress).call();
             document.getElementById('referralRewards').textContent = 

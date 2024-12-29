@@ -529,8 +529,17 @@
         document.getElementById('loading').style.display = show ? 'block' : 'none';
     }
 
-   function formatNumber(number, decimals = 6) {
-    return typeof number === 'string' ? number : number.toString();
+function formatNumber(number, decimals = 6) {
+    const num = typeof number === 'string' ? number : number.toString();
+    if (num === '0') {
+        return '0.' + '0'.repeat(decimals);
+    }
+    const parts = num.split('.');
+    if (parts.length === 1) {
+        return parts[0] + '.' + '0'.repeat(decimals);
+    }
+    const decimal = parts[1].padEnd(decimals, '0').slice(0, decimals);
+    return parts[0] + '.' + decimal;
 }
     async function updatePlatformInfo() {
         try {
@@ -768,10 +777,10 @@
             const userInfo = await contract.methods.getUserInfo(userAddress).call();
             document.getElementById('totalReferrals').textContent = userInfo.totalReferrals;
 
-// Get pending rewards
+          // Get pending rewards
             const rewards = await contract.methods.calculateReward(userAddress).call();
             document.getElementById('pendingRewards').textContent = 
-                formatNumber(web3.utils.fromWei(rewards, 'mwei'));
+                formatNumber(web3.utils.fromWei(rewards, 'mwei'), 6);
             showDebugInfo('Pending Rewards: ' + web3.utils.fromWei(rewards, 'mwei'));
 
             const referralRewards = await contract.methods.referralRewards(userAddress).call();

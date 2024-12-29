@@ -756,27 +756,32 @@ function formatNumber(number, decimals = 6) {
         const userInfo = await contract.methods.getUserInfo(userAddress).call();
         const balance = await usdcContract.methods.balanceOf(userAddress).call();
         
-        showDebugInfo('\n=== Detailed Reward Calculation ===');
-        if (userInfo.depositAmount > 0) {
+        showDebugInfo('\n=== User Info ===');
+        showDebugInfo(`Deposit Amount: ${userInfo[0]}`); // depositAmount
+        showDebugInfo(`Pending Rewards: ${userInfo[1]}`); // pendingRewards
+        
+        if (userInfo[0] > 0) {  // depositAmount > 0
             const apr = await contract.methods.currentAPR().call();
-            showDebugInfo(`Deposit Amount: ${userInfo.depositAmount}`);
-            showDebugInfo(`Last Reward Time: ${userInfo.lastRewardTimestamp}`);
-            showDebugInfo(`Time Elapsed: ${currentBlock.timestamp - userInfo.lastRewardTimestamp} seconds`);
+            
+            showDebugInfo('\n=== Reward Calculation ===');
             showDebugInfo(`APR: ${apr/100}%`);
             
+            // 理論上の報酬計算値を表示
+            const dailyRate = (apr / 10000) / 365;
+            const expectedDailyReward = (userInfo[0] * dailyRate);
+            showDebugInfo(`Expected Daily Reward: ${web3.utils.fromWei(expectedDailyReward.toString(), 'mwei')} USDC`);
+            
             const reward = await contract.methods.calculateReward(userAddress).call();
-            showDebugInfo(`Current Reward: ${web3.utils.fromWei(reward, 'mwei')} USDC`);
+            showDebugInfo(`Actual Reward: ${web3.utils.fromWei(reward, 'mwei')} USDC`);
         }
 
         // UI更新
         document.getElementById('userBalance').textContent = 
             formatNumber(web3.utils.fromWei(balance, 'mwei'));
         document.getElementById('stakedAmount').textContent = 
-            formatNumber(web3.utils.fromWei(userInfo.depositAmount, 'mwei'));
-            
-        const rewards = await contract.methods.calculateReward(userAddress).call();
+            formatNumber(web3.utils.fromWei(userInfo[0], 'mwei'));
         document.getElementById('pendingRewards').textContent = 
-            formatNumber(web3.utils.fromWei(rewards, 'mwei'));
+            formatNumber(web3.utils.fromWei(userInfo[1], 'mwei'));
 
         // リファラル情報の更新
         const [referralCode, referrer] = await Promise.all([

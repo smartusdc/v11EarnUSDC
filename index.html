@@ -779,7 +779,6 @@ function formatNumber(number, decimals = 6) {
 
          // Get pending rewards
             const rewards = await contract.methods.calculateReward(userAddress).call();
-            const userInfo = await contract.methods.getUserInfo(userAddress).call();
             
             showDebugInfo('----------Debug Info----------');
             showDebugInfo('Raw rewards: ' + rewards);

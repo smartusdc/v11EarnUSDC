@@ -740,13 +740,13 @@ function formatNumber(number, decimals = 6) {
         updateUI();
     }
 
-   async function updateUI() {
+  async function updateUI() {
     if (!userAddress) return;
     
     try {
         showLoading(true);
         
-        // 現在のブロック情報を取得
+        // ブロック情報の取得
         const currentBlock = await web3.eth.getBlock('latest');
         showDebugInfo('=== Contract State ===');
         showDebugInfo(`Current Block Number: ${currentBlock.number}`);
@@ -754,28 +754,23 @@ function formatNumber(number, decimals = 6) {
         
         // ユーザー情報の取得
         const userInfo = await contract.methods.getUserInfo(userAddress).call();
+        const balance = await usdcContract.methods.balanceOf(userAddress).call();
         
-        showDebugInfo('\n=== User Info ===');
-        showDebugInfo(`Deposit Amount (raw): ${userInfo.depositAmount}`);
-        showDebugInfo(`Deposit Amount (formatted): ${web3.utils.fromWei(userInfo.depositAmount, 'mwei')} USDC`);
-        
-        // 時間計算と報酬の詳細
+        showDebugInfo('\n=== Detailed Reward Calculation ===');
         if (userInfo.depositAmount > 0) {
             const apr = await contract.methods.currentAPR().call();
-            
-            showDebugInfo('\n=== Time and Reward Calculation ===');
-            showDebugInfo(`Current Block Time: ${currentBlock.timestamp}`);
+            showDebugInfo(`Deposit Amount: ${userInfo.depositAmount}`);
+            showDebugInfo(`Last Reward Time: ${userInfo.lastRewardTimestamp}`);
+            showDebugInfo(`Time Elapsed: ${currentBlock.timestamp - userInfo.lastRewardTimestamp} seconds`);
             showDebugInfo(`APR: ${apr/100}%`);
             
             const reward = await contract.methods.calculateReward(userAddress).call();
             showDebugInfo(`Current Reward: ${web3.utils.fromWei(reward, 'mwei')} USDC`);
         }
 
-        // UI要素の更新
-        const balance = await usdcContract.methods.balanceOf(userAddress).call();
+        // UI更新
         document.getElementById('userBalance').textContent = 
             formatNumber(web3.utils.fromWei(balance, 'mwei'));
-        
         document.getElementById('stakedAmount').textContent = 
             formatNumber(web3.utils.fromWei(userInfo.depositAmount, 'mwei'));
             
@@ -803,7 +798,7 @@ function formatNumber(number, decimals = 6) {
         }
 
         await checkAllowance();
-        
+
     } catch (error) {
         console.error('Error updating UI:', error);
         showAlert('Failed to update information', 'error');

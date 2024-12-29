@@ -746,30 +746,32 @@ function formatNumber(number, decimals = 6) {
     try {
         showLoading(true);
         
-        // 詳細なデバッグ情報の収集
-        showDebugInfo('=== Contract State ===');
+        // 現在のブロック情報を取得
         const currentBlock = await web3.eth.getBlock('latest');
+        showDebugInfo('=== Contract State ===');
+        showDebugInfo(`Current Block Number: ${currentBlock.number}`);
         showDebugInfo(`Block Timestamp: ${currentBlock.timestamp}`);
         
         // ユーザー情報の取得
         const userInfo = await contract.methods.getUserInfo(userAddress).call();
-        showDebugInfo('\n=== User Info ===');
-        showDebugInfo(`Deposit Amount: ${web3.utils.fromWei(userInfo.depositAmount, 'mwei')} USDC`);
-        showDebugInfo(`Last Reward Time: ${userInfo.lastRewardTimestamp || 'Not set'}`);
         
-        // 報酬計算のデバッグ
+        showDebugInfo('\n=== User Info ===');
+        showDebugInfo(`Deposit Amount (raw): ${userInfo.depositAmount}`);
+        showDebugInfo(`Deposit Amount (formatted): ${web3.utils.fromWei(userInfo.depositAmount, 'mwei')} USDC`);
+        
+        // 時間計算と報酬の詳細
         if (userInfo.depositAmount > 0) {
-            const timeElapsed = currentBlock.timestamp - (userInfo.lastRewardTimestamp || currentBlock.timestamp);
             const apr = await contract.methods.currentAPR().call();
-            showDebugInfo('\n=== Reward Debug ===');
-            showDebugInfo(`Time Elapsed: ${timeElapsed} seconds`);
-            showDebugInfo(`Current APR: ${apr / 100}%`);
+            
+            showDebugInfo('\n=== Time and Reward Calculation ===');
+            showDebugInfo(`Current Block Time: ${currentBlock.timestamp}`);
+            showDebugInfo(`APR: ${apr/100}%`);
             
             const reward = await contract.methods.calculateReward(userAddress).call();
-            showDebugInfo(`Actual Reward: ${web3.utils.fromWei(reward, 'mwei')} USDC`);
+            showDebugInfo(`Current Reward: ${web3.utils.fromWei(reward, 'mwei')} USDC`);
         }
 
-        // UI更新
+        // UI要素の更新
         const balance = await usdcContract.methods.balanceOf(userAddress).call();
         document.getElementById('userBalance').textContent = 
             formatNumber(web3.utils.fromWei(balance, 'mwei'));
@@ -810,7 +812,6 @@ function formatNumber(number, decimals = 6) {
         showLoading(false);
     }
 }
-
     async function approveUSDC() {
         if (!userAddress) return;
         

@@ -763,27 +763,32 @@ function formatNumber(number, decimals = 6) {
         if (userInfo[0] > 0) {  // depositAmount > 0
             const apr = await contract.methods.currentAPR().call();
             
-            showDebugInfo('\n=== Reward Calculation ===');
+            showDebugInfo('\n=== Contract Parameters ===');
             showDebugInfo(`APR: ${apr/100}%`);
+            showDebugInfo(`APR (raw): ${apr}`);
+            showDebugInfo(`USDC_PRECISION: ${1000000}`);
             
             // BigNumber計算を使用して理論上の報酬を計算
             const yearInSeconds = web3.utils.toBN(365 * 24 * 60 * 60);
             const depositAmount = web3.utils.toBN(userInfo[0]);
             const aprBN = web3.utils.toBN(apr);
             
-            // (depositAmount * apr / 10000) / 365 = 1日あたりの報酬
             const expectedDailyReward = depositAmount
                 .mul(aprBN)
                 .div(web3.utils.toBN(10000))
                 .div(web3.utils.toBN(365));
                 
+            showDebugInfo('\n=== Reward Calculation ===');
+            showDebugInfo(`Daily Rate: ${apr/10000/365}%`);
             showDebugInfo(`Expected Daily Reward: ${web3.utils.fromWei(expectedDailyReward, 'mwei')} USDC`);
+            showDebugInfo(`Expected Daily Reward (raw): ${expectedDailyReward.toString()}`);
             
             const reward = await contract.methods.calculateReward(userAddress).call();
             showDebugInfo(`Actual Reward: ${web3.utils.fromWei(reward, 'mwei')} USDC`);
+            showDebugInfo(`Actual Reward (raw): ${reward}`);
         }
 
-        // UI更新
+        // UI更新（変更なし）
         document.getElementById('userBalance').textContent = 
             formatNumber(web3.utils.fromWei(balance, 'mwei'));
         document.getElementById('stakedAmount').textContent = 
@@ -791,7 +796,7 @@ function formatNumber(number, decimals = 6) {
         document.getElementById('pendingRewards').textContent = 
             formatNumber(web3.utils.fromWei(userInfo[1], 'mwei'));
 
-        // リファラル情報の更新
+        // リファラル情報の更新（変更なし）
         const [referralCode, referrer] = await Promise.all([
             contract.methods.userToReferralCode(userAddress).call(),
             contract.methods.userToReferrer(userAddress).call()

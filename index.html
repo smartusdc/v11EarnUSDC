@@ -733,10 +733,22 @@
             showDebugInfo('Pending Rewards: ' + web3.utils.fromWei(rewards, 'mwei'));
 
             // Get referral rewards
+            // Get referral rewards and update referral code display
             const referralRewards = await contract.methods.referralRewards(userAddress).call();
             document.getElementById('referralRewards').textContent = 
                 formatNumber(web3.utils.fromWei(referralRewards, 'mwei'));
             showDebugInfo('Referral Rewards: ' + web3.utils.fromWei(referralRewards, 'mwei'));
+
+            // Check if user has a referral code and update button visibility
+            const userReferralCode = await contract.methods.userToReferralCode(userAddress).call();
+            const generateButton = document.getElementById('generateReferralCode');
+            if (userReferralCode !== '0') {
+                generateButton.style.display = 'none';
+                document.getElementById('yourReferralCode').textContent = userReferralCode;
+            } else {
+                generateButton.style.display = 'block';
+                document.getElementById('yourReferralCode').textContent = '-';
+            }
 
             // Check allowance for current stake amount
             await checkAllowance();

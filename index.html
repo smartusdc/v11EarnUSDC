@@ -766,10 +766,18 @@ function formatNumber(number, decimals = 6) {
             showDebugInfo('\n=== Reward Calculation ===');
             showDebugInfo(`APR: ${apr/100}%`);
             
-            // 理論上の報酬計算値を表示
-            const dailyRate = (apr / 10000) / 365;
-            const expectedDailyReward = (userInfo[0] * dailyRate);
-            showDebugInfo(`Expected Daily Reward: ${web3.utils.fromWei(expectedDailyReward.toString(), 'mwei')} USDC`);
+            // BigNumber計算を使用して理論上の報酬を計算
+            const yearInSeconds = web3.utils.toBN(365 * 24 * 60 * 60);
+            const depositAmount = web3.utils.toBN(userInfo[0]);
+            const aprBN = web3.utils.toBN(apr);
+            
+            // (depositAmount * apr / 10000) / 365 = 1日あたりの報酬
+            const expectedDailyReward = depositAmount
+                .mul(aprBN)
+                .div(web3.utils.toBN(10000))
+                .div(web3.utils.toBN(365));
+                
+            showDebugInfo(`Expected Daily Reward: ${web3.utils.fromWei(expectedDailyReward, 'mwei')} USDC`);
             
             const reward = await contract.methods.calculateReward(userAddress).call();
             showDebugInfo(`Actual Reward: ${web3.utils.fromWei(reward, 'mwei')} USDC`);

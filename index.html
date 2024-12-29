@@ -773,10 +773,18 @@
             document.getElementById('totalReferrals').textContent = userInfo.totalReferrals;
 
 // Get pending rewards
-const rewards = await contract.methods.calculateReward(userAddress).call();
-document.getElementById('pendingRewards').textContent = 
-    formatNumber(web3.utils.fromWei(rewards, 'mwei'));
-          showDebugInfo('Pending Rewards: ' + web3.utils.fromWei(rewards, 'mwei'));
+            const rewards = await contract.methods.calculateReward(userAddress).call();
+            showDebugInfo('Raw rewards value from contract: ' + rewards);
+            showDebugInfo('User address: ' + userAddress);
+
+            // ユーザー情報も取得して確認
+            const userInfo = await contract.methods.getUserInfo(userAddress).call();
+            showDebugInfo('User deposit amount: ' + userInfo.depositAmount);
+            showDebugInfo('User pending rewards: ' + userInfo.pendingRewards);
+
+            document.getElementById('pendingRewards').textContent = 
+                formatNumber(web3.utils.fromWei(rewards, 'mwei'));
+            showDebugInfo('Formatted Pending Rewards: ' + web3.utils.fromWei(rewards, 'mwei'));
 
             const referralRewards = await contract.methods.referralRewards(userAddress).call();
             document.getElementById('referralRewards').textContent = 

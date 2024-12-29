@@ -776,7 +776,7 @@
 const rewards = await contract.methods.calculateReward(userAddress).call();
 document.getElementById('pendingRewards').textContent = 
     formatNumber(web3.utils.fromWei(rewards, 'mwei'));
-            showDebugInfo('Pending Rewards: ' + web3.utils.fromWei(adjustedRewards, 'mwei'));
+          showDebugInfo('Pending Rewards: ' + web3.utils.fromWei(rewards, 'mwei'));
 
             const referralRewards = await contract.methods.referralRewards(userAddress).call();
             document.getElementById('referralRewards').textContent = 
